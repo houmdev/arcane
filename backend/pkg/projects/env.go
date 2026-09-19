@@ -459,7 +459,7 @@ func mergeEnvOverridesInPlaceInternal(gitContent, overrideContent string, overri
 			separator = " "
 		}
 
-		body = match[1] + match[2] + match[3] + formatEnvValueInternal(overrideValue) + separator + comment
+		body = match[1] + match[2] + match[3] + FormatEnvValue(overrideValue) + separator + comment
 		if hadCR {
 			body += "\r"
 		}
@@ -745,14 +745,15 @@ func formatEnvMapInternal(envMap EnvMap) string {
 	for _, key := range keys {
 		builder.WriteString(key)
 		builder.WriteByte('=')
-		builder.WriteString(formatEnvValueInternal(envMap[key]))
+		builder.WriteString(FormatEnvValue(envMap[key]))
 		builder.WriteByte('\n')
 	}
 
 	return builder.String()
 }
 
-func formatEnvValueInternal(value string) string {
+// FormatEnvValue escapes and quotes a value for Arcane's generated env files.
+func FormatEnvValue(value string) string {
 	if value == "" {
 		return value
 	}

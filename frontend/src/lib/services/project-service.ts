@@ -10,6 +10,12 @@ import type {
 	ProjectTagOption
 } from '#lib/types/swarm.js';
 import type { ProjectWorkspaceFileDraft } from '#lib/types/project-workspace.js';
+import type {
+	PortainerConnection,
+	PortainerImportRequest,
+	PortainerImportResult,
+	PortainerStackList
+} from '#lib/types/portainer.js';
 import { readNdjsonStream } from '#lib/utils/streaming.js';
 import { transformPaginationParams } from '#lib/utils/tables.js';
 import type { DeployProjectOptions } from '#lib/types/project-deployment.js';
@@ -283,6 +289,16 @@ class ProjectService extends BaseAPIService {
 	pullProjectImages(projectId: string, onLine: (data: any) => void): Promise<void>;
 	async pullProjectImages(projectId: string, onLine?: (data: any) => void): Promise<void> {
 		await this.streamProjectPull(projectId, onLine);
+	}
+
+	async listPortainerStacks(connection: PortainerConnection): Promise<PortainerStackList> {
+		const envId = await this.resolveEnvironmentId();
+		return this.handleResponse(this.api.post(`/environments/${envId}/projects/portainer/stacks`, connection));
+	}
+
+	async importPortainerStacks(request: PortainerImportRequest): Promise<PortainerImportResult> {
+		const envId = await this.resolveEnvironmentId();
+		return this.handleResponse(this.api.post(`/environments/${envId}/projects/portainer/import`, request));
 	}
 
 	async destroyProject(projectName: string, removeVolumes = false): Promise<void> {

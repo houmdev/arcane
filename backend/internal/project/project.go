@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,6 +51,7 @@ type ProjectService struct {
 	kvService                   *kv.KVService
 	containerRegistryService    *registry.ContainerRegistryService
 	config                      *config.Config
+	httpClient                  *http.Client
 	registryCredentialsProvider registryCredentialsProviderInternal
 
 	// syncMu serializes SyncProjectsFromFileSystem: its discovery walk and its
@@ -342,6 +344,16 @@ func (s *ProjectService) WithKVService(kvService *kv.KVService) *ProjectService 
 		return nil
 	}
 	s.kvService = kvService
+	return s
+}
+
+// WithHTTPClient supplies the outbound client used to reach external systems
+// such as a Portainer instance during an import.
+func (s *ProjectService) WithHTTPClient(httpClient *http.Client) *ProjectService {
+	if s == nil {
+		return nil
+	}
+	s.httpClient = httpClient
 	return s
 }
 

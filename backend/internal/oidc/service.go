@@ -2,7 +2,6 @@ package oidc
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json/v2"
 	"fmt"
@@ -25,6 +24,7 @@ import (
 	"github.com/getarcaneapp/arcane/backend/v2/internal/config"
 	"github.com/getarcaneapp/arcane/backend/v2/internal/settings"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils"
+	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils/httpx"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils/jwtclaims"
 	"github.com/getarcaneapp/arcane/backend/v2/pkg/utils/oidcjwk"
 	authtypes "github.com/getarcaneapp/arcane/types/v2/auth"
@@ -115,38 +115,13 @@ func (s *OidcService) getInsecureHttpClientInternal() *http.Client {
 		return s.insecureHttpClient
 	}
 
-	// Create insecure client
-	insecureClient := *s.httpClient
-
-	var insecureTransport *http.Transport
-	if transport, ok := insecureClient.Transport.(*http.Transport); ok {
-		insecureTransport = transport.Clone()
-	} else {
-		// Transport is nil or not *http.Transport - create a new default transport
-		if defaultTransport, ok := http.DefaultTransport.(*http.Transport); ok {
-			insecureTransport = defaultTransport.Clone()
-		} else {
-			insecureTransport = &http.Transport{}
-		}
+	insecureClient, err := httpx.NewInsecureTLSClient(s.httpClient)
+	if err != nil {
+		slog.Error("failed to build OIDC client without TLS verification; using the verifying client", "error", err)
+		return s.httpClient
 	}
 
-	if insecureTransport.TLSClientConfig == nil {
-		// #nosec G402 - This is explicitly an insecure client for OIDC discovery when TLS verification is skipped
-		insecureTransport.TLSClientConfig = &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: true,
-		}
-	} else {
-		insecureTransport.TLSClientConfig.InsecureSkipVerify = true
-	}
-	// Enable HTTP/2 even with a custom TLS configuration.
-	if insecureTransport.Protocols == nil {
-		insecureTransport.Protocols = new(http.Protocols)
-		insecureTransport.Protocols.SetHTTP1(true)
-	}
-	insecureTransport.Protocols.SetHTTP2(true)
-	insecureClient.Transport = insecureTransport
-	s.insecureHttpClient = &insecureClient
+	s.insecureHttpClient = insecureClient
 	return s.insecureHttpClient
 }
 
