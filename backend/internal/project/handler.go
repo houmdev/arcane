@@ -162,6 +162,7 @@ func RegisterProjects(api huma.API, projectService *ProjectService, activityServ
 		appCtx:          appCtx.Context(),
 	}
 	registerProjectWorkspaceRoutesInternal(api, h)
+	registerProjectPortainerRoutesInternal(api, h)
 
 	middleware.RegisterWithPermission(api, huma.Operation{
 		OperationID: "list-projects",

@@ -17,6 +17,9 @@
 	import { createMutation, createQuery, keepPreviousData } from '@tanstack/svelte-query';
 	import { ResourcePageLayout, type ActionButton, type StatCardConfig } from '#lib/layouts/index.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
+	import PortainerImportDialog from '#lib/components/dialogs/portainer-import-dialog.svelte';
+	import type { PortainerImportResult } from '#lib/types/portainer.js';
+	import { DownloadIcon } from '#lib/icons/index.js';
 
 	let { data } = $props();
 
@@ -37,6 +40,7 @@
 	let baseProjectRequestOptions = $state(untrack(() => withArchivedFilter(data.projectRequestOptions, data.showArchived)));
 	let selectedIds = $state<string[]>([]);
 	let isManualRefreshing = $state(false);
+	let showPortainerImportDialog = $state(false);
 	const envId = $derived(environmentStore.selected?.id || '0');
 	const showArchived = $derived(page.url.searchParams.get('archived') === 'true');
 	const projectRequestOptions = $derived(withArchivedFilter(baseProjectRequestOptions, showArchived));
@@ -163,6 +167,25 @@
 	const archivedCompose = $derived(projectStatusCounts.archivedProjects);
 	const isRefreshBlocked = $derived(isManualRefreshing || projectsQuery.isFetching || projectStatusCountsQuery.isFetching);
 
+	async function handlePortainerImported(result: PortainerImportResult) {
+		if (result.imported > 0) {
+			const toastOptions = activityToastOptions(result.activityId);
+			if (result.failed > 0) {
+				toast.warning(
+					m.portainer_import_partial({
+						imported: result.imported,
+						total: result.imported + result.failed,
+						failed: result.failed
+					}),
+					toastOptions
+				);
+			} else {
+				toast.success(m.portainer_import_success({ count: result.imported }), toastOptions);
+			}
+			await Promise.all([projectsQuery.refetch(), projectStatusCountsQuery.refetch()]);
+		}
+	}
+
 	async function handleCheckForUpdates() {
 		await checkUpdatesMutation.mutateAsync(envId);
 	}
@@ -201,6 +224,13 @@
 				action: 'create',
 				label: m.compose_create_project(),
 				onclick: () => goto('/projects/new')
+			});
+			buttons.push({
+				id: 'import-portainer',
+				action: 'base',
+				label: m.portainer_import_title(),
+				icon: DownloadIcon,
+				onclick: () => (showPortainerImportDialog = true)
 			});
 		}
 		if (canDeployProject) {
@@ -274,3 +304,5 @@
 		{/if}
 	{/snippet}
 </ResourcePageLayout>
+
+<PortainerImportDialog bind:open={showPortainerImportDialog} onImported={handlePortainerImported} />

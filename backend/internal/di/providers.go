@@ -313,9 +313,10 @@ func provideContainerRegistryServiceInternal(module *registry.Module) *registry.
 	return module.Service()
 }
 
-func provideProjectServiceInternal(db *database.DB, settings *settings.SettingsService, event *event.EventService, image *image.ImageService, docker *docker.DockerClientService, build *build.BuildService, lifecycleService *project.LifecycleService, kv *kv.KVService, registry *registry.ContainerRegistryService, environment *environment.EnvironmentService, cfg *config.Config) *project.ProjectService {
+func provideProjectServiceInternal(db *database.DB, settings *settings.SettingsService, event *event.EventService, image *image.ImageService, docker *docker.DockerClientService, build *build.BuildService, lifecycleService *project.LifecycleService, kv *kv.KVService, registry *registry.ContainerRegistryService, environment *environment.EnvironmentService, httpClient *http.Client, cfg *config.Config) *project.ProjectService {
 	return project.NewProjectService(db, settings, event, image, docker, build, lifecycleService, registry, cfg).
 		WithKVService(kv).
+		WithHTTPClient(httpClient).
 		WithRegistryCredentialsProvider(environment.GetEnabledRegistryCredentials)
 }
 

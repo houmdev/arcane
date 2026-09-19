@@ -324,6 +324,12 @@ func ProjectWorkspaceFile(envID, projectID string) string {
 func ProjectWorkspaceFileDownload(envID, projectID string) string {
 	return pathf("/api/environments/%s/projects/%s/workspace/file/download", envID, projectID)
 }
+func ProjectsPortainerStacks(envID string) string {
+	return pathf("/api/environments/%s/projects/portainer/stacks", envID)
+}
+func ProjectsPortainerImport(envID string) string {
+	return pathf("/api/environments/%s/projects/portainer/import", envID)
+}
 
 // System endpoints
 
