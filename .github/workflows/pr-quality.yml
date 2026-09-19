@@ -11,7 +11,7 @@ on:
 
 jobs:
     pr-quality:
-        runs-on: ubuntu-latest
+        runs-on: linux
         steps:
             - name: Request App Token
               id: app-token
