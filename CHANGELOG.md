@@ -1,3 +1,42 @@
+## v2.13.0
+
+### New features
+
+* add stream label toggle for STDOUT/STDERR ([#3976](https://github.com/getarcaneapp/arcane/pull/3976) by @kmendell)
+* add Telegram topic destinations ([#3978](https://github.com/getarcaneapp/arcane/pull/3978) by @kmendell)
+* add timestamp toggle to log viewer controls ([#3979](https://github.com/getarcaneapp/arcane/pull/3979) by @kmendell)
+* add personal default for the project editor layout ([#3986](https://github.com/getarcaneapp/arcane/pull/3986) by @kmendell)
+* allow bulk updates for selected containers ([#3971](https://github.com/getarcaneapp/arcane/pull/3971) by @mewajda)
+* allow viewing retained logs for stopped projects ([#4097](https://github.com/getarcaneapp/arcane/pull/4097) by @kmendell)
+
+### Bug fixes
+
+* nest services/networks under their section in compose outline ([#3985](https://github.com/getarcaneapp/arcane/pull/3985) by @angst911)
+* let backend generate run IDs for manual job submissions ([#3987](https://github.com/getarcaneapp/arcane/pull/3987) by @kmendell)
+* add a separate tag-listing timeout for large registries ([#3990](https://github.com/getarcaneapp/arcane/pull/3990) by @kmendell)
+* sort containers by live CPU and memory usage globally ([#4099](https://github.com/getarcaneapp/arcane/pull/4099) by @kmendell)
+* surface Update All start errors and adopt an already-running job ([#4104](https://github.com/getarcaneapp/arcane/pull/4104) by @kmendell)
+* sort subnet and gateway columns numerically ([#4119](https://github.com/getarcaneapp/arcane/pull/4119) by @kmendell)
+* stop header actions overlapping badges and add per-device layout mode ([#4121](https://github.com/getarcaneapp/arcane/pull/4121) by @kmendell)
+* include container image references in update discovery ([#4126](https://github.com/getarcaneapp/arcane/pull/4126) by @kmendell)
+* show project-scoped versions instead of image digests ([#4127](https://github.com/getarcaneapp/arcane/pull/4127) by @kmendell)
+
+### Performance improvements
+
+* skip per-message visibility rereads and source lookups on the local stream ([#4105](https://github.com/getarcaneapp/arcane/pull/4105) by @kmendell)
+* resolve GitOps compose paths once per list request ([#4106](https://github.com/getarcaneapp/arcane/pull/4106) by @kmendell)
+* enrich filtered project lists after pagination ([#4108](https://github.com/getarcaneapp/arcane/pull/4108) by @kmendell)
+* dedupe and parallelize container tag checks ([#4109](https://github.com/getarcaneapp/arcane/pull/4109) by @kmendell)
+* replace repeated update-record scans with indexed lookups ([#4110](https://github.com/getarcaneapp/arcane/pull/4110) by @kmendell)
+
+### Other
+
+* update sidebar update item ([#4003](https://github.com/getarcaneapp/arcane/pull/4003) by @kmendell)
+
+
+
+**Full Changelog**: https://github.com/getarcaneapp/arcane/compare/v2.12.0...v2.13.0
+
 ## v2.12.0
 
 ### New features
