@@ -279,7 +279,7 @@ func (s *UpdaterService) applyScopedUpdatesInternal(ctx context.Context, options
 		return common.ErrUpdaterNoContainersMatched
 	}
 
-	engineOpts := updater.Options{Force: options.ForceUpdate, DryRun: options.DryRun}
+	engineOpts := moduleOptionsFromUpdaterOptionsInternal(options)
 	var engineErrs []error
 	for _, containerID := range containerIDs {
 		target := schedulertypes.TargetOutcome{ID: containerID, ResourceType: "container", Status: schedulertypes.Running}
@@ -459,7 +459,10 @@ func (s *UpdaterService) UpdateSingleContainer(ctx context.Context, containerID 
 	s.updateMu.Lock()
 	defer s.updateMu.Unlock()
 
-	moduleResult, engineErr := s.engineInternal().UpdateContainer(ctx, containerID, updater.Options{})
+	// The caller picked this container, so the autoUpdateExcludedContainers
+	// setting does not apply: it only governs automatic and pending runs, which
+	// keep skipping the container. Labels and immutable references still do.
+	moduleResult, engineErr := s.engineInternal().UpdateContainer(ctx, containerID, updater.Options{IgnoreSettingsExclusions: true})
 	if moduleResult != nil {
 		out = resultFromModuleInternal(moduleResult)
 		out.ActivityID = mo.EmptyableToOption(strings.TrimSpace(activityID)).ToPointer()
@@ -999,7 +1002,9 @@ func imageUpdateRecordToModuleInternal(record imageupdate.ImageUpdateRecord) upd
 // moduleOptionsFromUpdaterOptionsInternal narrows Arcane's request options to
 // what the engine acts on. Options.Type and Options.ResourceIds stay behind:
 // the engine never read them, and ApplyPending already routes a scoped request
-// through applyScopedUpdatesInternal before reaching the engine.
+// through applyScopedUpdatesInternal before reaching the engine. Settings
+// exclusions always apply to these runs; only UpdateSingleContainer overrides
+// them for its explicitly requested container.
 func moduleOptionsFromUpdaterOptionsInternal(options arcaneupdater.Options) updater.Options {
 	return updater.Options{
 		Force:  options.ForceUpdate,
@@ -1221,7 +1226,7 @@ func (s *UpdaterService) collectUsedImagesFromContainersInternal(ctx context.Con
 			continue
 		}
 
-		if containerSummaryExcludedInternal(summary, excludedContainers) {
+		if dockerutil.ContainerNameExcluded(summary.Names, excludedContainers) {
 			s.loggerInternal().DebugContext(ctx, "collectUsedImagesFromContainers: skipping excluded container", "containerId", summary.ID, "names", summary.Names)
 			continue
 		}
@@ -1299,15 +1304,7 @@ func (s *UpdaterService) buildExcludedContainerSetInternal(ctx context.Context) 
 	if s.deps.Settings == nil {
 		return nil
 	}
-	names := utils.UniqueNonEmptyStrings(strings.Split(s.deps.Settings.GetStringSetting(ctx, "autoUpdateExcludedContainers", ""), ","))
-	if len(names) == 0 {
-		return nil
-	}
-	excluded := make(map[string]bool, len(names))
-	for _, name := range names {
-		excluded[name] = true
-	}
-	return excluded
+	return dockerutil.ExcludedContainerNameSet(s.deps.Settings.GetStringSetting(ctx, "autoUpdateExcludedContainers", ""))
 }
 
 func (s *UpdaterService) collectUsedImagesFromProjectsInternal(ctx context.Context, out map[string]struct{}) error {
@@ -1378,16 +1375,4 @@ func addNormalizedImageUpdateRefInternal(ctx context.Context, out map[string]str
 		return
 	}
 	slog.Debug(logMessage, args...)
-}
-
-func containerSummaryExcludedInternal(summary container.Summary, excludedContainers map[string]bool) bool {
-	if len(excludedContainers) == 0 {
-		return false
-	}
-	for _, name := range summary.Names {
-		if excludedContainers[strings.TrimPrefix(name, "/")] {
-			return true
-		}
-	}
-	return false
 }

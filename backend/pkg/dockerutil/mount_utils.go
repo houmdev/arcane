@@ -2,7 +2,12 @@ package docker
 
 import (
 	"context"
+	"log/slog"
+	"path"
+	"slices"
 	"strings"
+
+	"emperror.dev/errors"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
@@ -103,6 +108,57 @@ func MountForSubpath(mounts []container.MountPoint, containerPath string, target
 	}
 }
 
+// MountForEnclosingPath returns the most-specific mount covering containerPath
+// mounted whole at target, plus containerPath's path relative to that mount.
+// Unlike MountForSubpath the subpath need not exist yet, so restores can create
+// it. Returns nil when no bind or volume mount covers containerPath.
+func MountForEnclosingPath(mounts []container.MountPoint, containerPath string, target string) (*mount.Mount, string) {
+	if strings.TrimSpace(containerPath) == "" {
+		return nil, ""
+	}
+	var best *container.MountPoint
+	for i := range mounts {
+		m := &mounts[i]
+		if m.Destination == "" || !pathHasPrefixInternal(containerPath, m.Destination) {
+			continue
+		}
+		if best == nil || len(m.Destination) > len(best.Destination) {
+			best = m
+		}
+	}
+	if best == nil {
+		return nil, ""
+	}
+	enclosing := MountForDestination(mounts, best.Destination, target)
+	if enclosing == nil {
+		return nil, ""
+	}
+	return enclosing, strings.TrimPrefix(strings.TrimPrefix(containerPath, best.Destination), "/")
+}
+
+// NestedMounts mirrors every bind or volume mount whose destination lies
+// strictly below containerPath, re-targeted beneath target, so a helper
+// container sees the same tree the current container does. Parents precede
+// their children; unsupported mount types are skipped.
+func NestedMounts(mounts []container.MountPoint, containerPath string, target string) []mount.Mount {
+	containerPath = strings.TrimRight(containerPath, "/")
+	if containerPath == "" {
+		return nil
+	}
+	var nested []mount.Mount
+	for _, m := range mounts {
+		if m.Destination == containerPath || !pathHasPrefixInternal(m.Destination, containerPath) {
+			continue
+		}
+		relative := strings.TrimPrefix(strings.TrimPrefix(m.Destination, containerPath), "/")
+		if mirrored := MountForDestination(mounts, m.Destination, path.Join(target, relative)); mirrored != nil {
+			nested = append(nested, *mirrored)
+		}
+	}
+	slices.SortStableFunc(nested, func(a, b mount.Mount) int { return len(a.Target) - len(b.Target) })
+	return nested
+}
+
 // pathHasPrefixInternal reports whether containerPath is at or under prefix,
 // treating both as POSIX-style paths. Avoids false positives like
 // "/app/datax" matching "/app/data".
@@ -159,4 +215,57 @@ func MountForDestination(mounts []container.MountPoint, destination string, targ
 	}
 
 	return nil
+}
+
+// PreserveVolumeMounts returns cloned binds and mounts with every inspected
+// volume pinned to its name, so a recreate reuses it instead of a new anonymous one.
+func PreserveVolumeMounts(binds []string, mounts []mount.Mount, mountPoints []container.MountPoint) ([]string, []mount.Mount, error) {
+	binds = slices.Clone(binds)
+	mounts = slices.Clone(mounts)
+
+	for _, mp := range mountPoints {
+		if mp.Type != mount.TypeVolume {
+			continue
+		}
+		destination := path.Clean(mp.Destination)
+		volumeName := strings.TrimSpace(mp.Name)
+		if volumeName == "" {
+			return nil, nil, errors.Errorf("volume mounted at %s has no volume name", destination)
+		}
+
+		mountIndex := slices.IndexFunc(mounts, func(m mount.Mount) bool {
+			return path.Clean(m.Target) == destination
+		})
+		if mountIndex >= 0 {
+			if mounts[mountIndex].Type == mount.TypeVolume {
+				mounts[mountIndex].Source = volumeName
+			}
+			slog.Info("Preserving volume via mount", "destination", destination, "volume", volumeName)
+			continue
+		}
+
+		// Short syntax is "/dest" for anonymous volumes or "src:/dest[:opts]".
+		bindIndex := slices.IndexFunc(binds, func(bind string) bool {
+			parts := strings.SplitN(bind, ":", 3)
+			if len(parts) == 1 {
+				return path.Clean(parts[0]) == destination
+			}
+			return path.Clean(parts[1]) == destination
+		})
+		if bindIndex >= 0 {
+			if !strings.Contains(binds[bindIndex], ":") {
+				binds[bindIndex] = volumeName + ":" + binds[bindIndex]
+			}
+			slog.Info("Preserving volume via bind", "destination", destination, "volume", volumeName)
+			continue
+		}
+
+		explicit := MountForDestination(mountPoints, mp.Destination, mp.Destination)
+		if explicit == nil {
+			return nil, nil, errors.Errorf("cannot build explicit mount for volume %s at %s", volumeName, destination)
+		}
+		mounts = append(mounts, *explicit)
+		slog.Info("Preserving image-declared volume", "destination", destination, "volume", volumeName)
+	}
+	return binds, mounts, nil
 }
