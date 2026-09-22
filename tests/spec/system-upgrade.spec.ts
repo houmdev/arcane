@@ -3,7 +3,7 @@ import { test, expect, type Page, type Route } from '../fixtures/test.fixture';
 const REFRESH_TOKEN_KEY = 'arcane_refresh_token';
 const TOKEN_EXPIRY_KEY = 'arcane_token_expiry';
 const REFRESH_COOKIE = 'arcane_refresh_test=complete';
-const RELOAD_COUNT_KEY = 'arcane_upgrade_reload_count';
+const reloadCounts = new WeakMap<Page, number>();
 
 type ManagerStatus = 'updated' | 'failed' | 'updating';
 type JobStatus = 'running' | 'completed' | 'failed';
@@ -58,11 +58,11 @@ function dashboardSnapshot() {
 	};
 }
 
-async function registerReloadCounter(page: Page) {
-	await page.addInitScript((key: string) => {
-		const count = Number(sessionStorage.getItem(key) ?? '0');
-		sessionStorage.setItem(key, String(count + 1));
-	}, RELOAD_COUNT_KEY);
+function registerReloadCounter(page: Page) {
+	reloadCounts.set(page, 0);
+	page.on('domcontentloaded', () => {
+		reloadCounts.set(page, (reloadCounts.get(page) ?? 0) + 1);
+	});
 }
 
 async function registerTokenSeeding(page: Page) {
@@ -92,11 +92,8 @@ async function openAndConfirmUpdateAll(page: Page) {
 	await dialog.getByRole('button', { name: 'Update All', exact: true }).click();
 }
 
-async function currentReloadCount(page: Page) {
-	return page.evaluate(
-		(key: string) => Number(sessionStorage.getItem(key) ?? '0'),
-		RELOAD_COUNT_KEY
-	);
+function currentReloadCount(page: Page) {
+	return reloadCounts.get(page) ?? 0;
 }
 
 // Huma renders errors as RFC 7807 problem documents; the dialog surfaces `detail`.
@@ -173,6 +170,7 @@ test.describe('Update All startup', () => {
 	test('a 409 conflict without an active job reports the conflict and does not retry', async ({
 		page
 	}) => {
+		await page.clock.install();
 		let startCalls = 0;
 		let statusCalls = 0;
 		await page.route(/\/api\/environments\/0\/system\/upgrade\/all$/, async (route) => {
@@ -199,7 +197,7 @@ test.describe('Update All startup', () => {
 
 		// Wait past one poll interval to prove neither polling nor a retry kicked in.
 		// The three status reads are the persistence-window grace, not polling.
-		await page.waitForTimeout(4_000);
+		await page.clock.runFor(4_000);
 		expect(startCalls).toBe(1);
 		expect(statusCalls).toBe(3);
 	});
@@ -236,6 +234,7 @@ test.describe('Update All startup', () => {
 	});
 
 	test('closing the dialog during a pending start ignores the late response', async ({ page }) => {
+		await page.clock.install();
 		let releaseStart!: () => void;
 		const startReleased = new Promise<void>((resolve) => {
 			releaseStart = resolve;
@@ -260,7 +259,7 @@ test.describe('Update All startup', () => {
 
 		// The start response arrives after closure: it must not reopen or start polling.
 		releaseStart();
-		await page.waitForTimeout(4_000);
+		await page.clock.runFor(4_000);
 		await expect(dialog).toBeHidden();
 		expect(statusCalls).toBe(0);
 		await expect(page.locator('li[data-sonner-toast]')).toHaveCount(0);
@@ -271,7 +270,7 @@ test.describe('Manager self-update recovery', () => {
 	test('Update All keeps the manager result visible and refreshes without a document reload', async ({
 		page
 	}) => {
-		await registerReloadCounter(page);
+		registerReloadCounter(page);
 		await page.route(/\/api\/environments\/0\/system\/upgrade\/all$/, async (route) => {
 			await fulfillJob(route, 'running', 'updating');
 		});
@@ -299,7 +298,7 @@ test.describe('Manager self-update recovery', () => {
 	});
 
 	test('Update All leaves failed manager results visible without reloading', async ({ page }) => {
-		await registerReloadCounter(page);
+		registerReloadCounter(page);
 		await page.route(/\/api\/environments\/0\/system\/upgrade\/all$/, async (route) => {
 			await fulfillJob(route, 'running', 'updating');
 		});
@@ -320,7 +319,7 @@ test.describe('Manager self-update recovery', () => {
 	test('the single-manager flow reloads immediately after version verification', async ({
 		page
 	}) => {
-		await registerReloadCounter(page);
+		registerReloadCounter(page);
 		const snapshot = dashboardSnapshot();
 		let upgradeTriggered = false;
 
@@ -395,7 +394,8 @@ test.describe('Manager self-update recovery', () => {
 	});
 
 	test('status and activity 401s share one refresh before the upgrade reload', async ({ page }) => {
-		await registerReloadCounter(page);
+		await page.clock.install();
+		registerReloadCounter(page);
 		await registerTokenSeeding(page);
 
 		let releaseActivity!: () => void;
@@ -435,9 +435,13 @@ test.describe('Manager self-update recovery', () => {
 		});
 
 		let refreshCalls = 0;
+		let releaseRefresh!: () => void;
+		const refreshReleased = new Promise<void>((resolve) => {
+			releaseRefresh = resolve;
+		});
 		await page.route(/\/api\/auth\/refresh$/, async (route) => {
 			refreshCalls++;
-			await new Promise((resolve) => setTimeout(resolve, 3500));
+			await refreshReleased;
 			await route.fulfill({
 				status: 200,
 				headers: {
@@ -459,6 +463,10 @@ test.describe('Manager self-update recovery', () => {
 			await fulfillJob(route, 'running', 'updating');
 		});
 		await page.route(/\/api\/environments\/0\/system\/upgrade\/all\/status$/, async (route) => {
+			if (route.request().headers()['cookie']?.includes(REFRESH_COOKIE)) {
+				await fulfillJob(route, 'completed', 'updated');
+				return;
+			}
 			await route.fulfill({
 				status: 401,
 				contentType: 'application/json',
@@ -466,19 +474,39 @@ test.describe('Manager self-update recovery', () => {
 			});
 		});
 
-		await page.goto('/environments');
-		await openAndConfirmUpdateAll(page);
-		releaseActivity();
+		try {
+			await page.goto('/environments');
+			const statusUnauthorized = page.waitForResponse((response) => {
+				return (
+					new URL(response.url()).pathname === '/api/environments/0/system/upgrade/all/status' &&
+					response.status() === 401
+				);
+			});
+			await openAndConfirmUpdateAll(page);
+			releaseActivity();
+			await expect.poll(() => refreshCalls).toBe(1);
+			await page.clock.runFor(3500);
+			const statusResponse = await statusUnauthorized;
+			await statusResponse.finished();
+			// Queue this after the response event so its 401 handler has joined the
+			// in-flight refresh before that refresh is released.
+			await page.evaluate(() => undefined);
+			expect(refreshCalls).toBe(1);
+			releaseRefresh();
 
-		await expect.poll(() => currentReloadCount(page), { timeout: 15_000 }).toBe(2);
-		expect(refreshCalls).toBe(1);
-		await expect(page).toHaveURL('/environments');
+			await expect.poll(() => currentReloadCount(page), { timeout: 15_000 }).toBe(2);
+			expect(refreshCalls).toBe(1);
+			await expect(page).toHaveURL('/environments');
+		} finally {
+			releaseActivity();
+			releaseRefresh();
+		}
 	});
 
 	test('a transient refresh failure keeps the token and recovers on the next poll', async ({
 		page
 	}) => {
-		await registerReloadCounter(page);
+		registerReloadCounter(page);
 		await registerTokenSeeding(page);
 
 		let refreshCalls = 0;

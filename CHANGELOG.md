@@ -1,3 +1,14 @@
+## v2.13.1
+
+### Bug fixes
+
+- create missing project bind directories as the runtime user ([\#4138](https://github.com/getarcaneapp/arcane/pull/4138) by @kmendell)
+- update compose example to include DISTRIBUTION=1 ([1b21e5c](https://github.com/getarcaneapp/arcane/commit/1b21e5c3594d3e60d8f8a449981a078a989790d6) by @kmendell)
+- allow manual updates of containers excluded from auto-update ([\#4139](https://github.com/getarcaneapp/arcane/pull/4139) by @kmendell)
+- preserve data volumes when recreating containers during upgrade ([\#4141](https://github.com/getarcaneapp/arcane/pull/4141) by @kmendell)
+- include separately mounted projects in system backups ([\#4144](https://github.com/getarcaneapp/arcane/pull/4144) by @kmendell)
+
+**Full Changelog**: https://github.com/getarcaneapp/arcane/compare/v2.13.0...v2.13.1
 ## v2.13.0
 
 ### New features

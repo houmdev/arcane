@@ -16,7 +16,7 @@ services:
       - COMMIT=0
       - CONFIGS=0
       - CONTAINERS=1
-      - DISTRIBUTION=0
+      - DISTRIBUTION=1
       - EXEC=1
       - IMAGES=1
       - INFO=1

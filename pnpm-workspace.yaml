@@ -56,8 +56,8 @@ minimumReleaseAgeExclude:
   - vite-plus@0.3.0
 
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@0.3.2
-  vite-plus: 0.3.2
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.3
+  vite-plus: 0.3.3
 peerDependencyRules:
   allowAny:
     - vite

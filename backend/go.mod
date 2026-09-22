@@ -20,7 +20,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.5
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.66.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1
-	github.com/aws/smithy-go v1.28.1
+	github.com/aws/smithy-go v1.28.2
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/coder/websocket v1.8.15
 	github.com/compose-spec/compose-go/v2 v2.15.0
@@ -33,11 +33,11 @@ require (
 	github.com/docker/compose/v5 v5.5.1
 	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/getarcaneapp/arcane/cli/v2 v2.12.0
-	github.com/getarcaneapp/arcane/types/v2 v2.12.0
+	github.com/getarcaneapp/arcane/cli/v2 v2.13.0
+	github.com/getarcaneapp/arcane/types/v2 v2.13.0
 	github.com/go-git/go-billy/v5 v5.9.1
 	github.com/go-git/go-git/v5 v5.19.2
-	github.com/go-webauthn/webauthn v0.18.1
+	github.com/go-webauthn/webauthn v0.18.2
 	github.com/gofrs/flock v0.13.1
 	github.com/google/go-containerregistry v0.22.1
 	github.com/google/uuid v1.6.0
@@ -76,7 +76,7 @@ require (
 	go.getarcane.app/streams v0.4.3
 	go.getarcane.app/sys/cgroup v0.2.3
 	go.getarcane.app/sys/crypto v0.2.1
-	go.getarcane.app/updater v0.9.3
+	go.getarcane.app/updater v0.10.0
 	go.uber.org/fx v1.24.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/crypto v0.57.0
@@ -88,7 +88,7 @@ require (
 	golang.org/x/term v0.46.0
 	golang.org/x/text v0.42.0
 	golang.org/x/time v0.16.0
-	google.golang.org/grpc v1.83.2
+	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
@@ -161,7 +161,7 @@ require (
 	github.com/fogleman/ease v0.0.0-20170301025033-8da417bf1776 // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
 	github.com/fvbommel/sortorder v1.2.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
